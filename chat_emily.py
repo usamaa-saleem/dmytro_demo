@@ -16,7 +16,7 @@ load_dotenv()
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
-RUNPOD_API_URL = "https://api.runpod.ai/v2/zg3dmoeo5xvf9z/runsync"
+RUNPOD_API_URL = "https://api.runpod.ai/v2/57v83i0ochg2mb/runsync"
 MAX_HISTORY_LENGTH = 40  # Maximum number of messages to keep (excluding system prompt)
 
 # System prompt defining Emily's personality
