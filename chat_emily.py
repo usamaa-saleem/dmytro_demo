@@ -3,8 +3,6 @@ import requests
 import json
 import re
 import time
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
 import os
 from dotenv import load_dotenv
 import tempfile
@@ -13,9 +11,6 @@ from io import BytesIO
 
 # Load environment variables
 load_dotenv()
-
-# Initialize Mistral client
-client = MistralClient(api_key=os.getenv('MISTRAL_API_KEY'))
 
 # Configuration
 MISTRAL_API_KEY = "vs8RXNaQzh5SMsc2OGWLjo3ETyaU8kNL"  # Replace with your actual API key
