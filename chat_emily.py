@@ -3,6 +3,19 @@ import requests
 import json
 import re
 import time
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
+import os
+from dotenv import load_dotenv
+import tempfile
+from PIL import Image
+from io import BytesIO
+
+# Load environment variables
+load_dotenv()
+
+# Initialize Mistral client
+client = MistralClient(api_key=os.getenv('MISTRAL_API_KEY'))
 
 # Configuration
 MISTRAL_API_KEY = "vs8RXNaQzh5SMsc2OGWLjo3ETyaU8kNL"  # Replace with your actual API key
@@ -236,6 +249,16 @@ def get_mistral_response(messages):
         st.error(f"Error getting response from Mistral: {str(e)}")
         return "I'm having trouble connecting right now. Can we try again?"
 
+def download_image(image_url):
+    """Download image from URL and return as PIL Image object."""
+    try:
+        response = requests.get(image_url)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content))
+    except Exception as e:
+        st.error(f"Failed to download image: {str(e)}")
+        return None
+
 def main():
     st.title("Chat with Emily 💝")
     
@@ -249,10 +272,11 @@ def main():
                 st.write(message["content"])
                 if message.get("image_url"):
                     if message["image_url"]:
-                        # Create a container for the image
-                        with st.container():
-                            # Display image with smaller width (will expand on click)
-                            st.image(message["image_url"], width=300, caption="Click to expand")
+                        # Download and display image
+                        img = download_image(message["image_url"])
+                        if img:
+                            with st.container():
+                                st.image(img, width=300, caption="Click to expand")
                     else:
                         st.error("Sorry, I couldn't generate that image right now.")
     
@@ -291,8 +315,10 @@ def main():
                 with st.chat_message("assistant"):
                     st.write(response)
                     if image_url:
-                        with st.container():
-                            st.image(image_url, width=300, caption="Click to expand")
+                        img = download_image(image_url)
+                        if img:
+                            with st.container():
+                                st.image(img, width=300, caption="Click to expand")
                     else:
                         st.error("Sorry, I couldn't generate that image right now.")
                 
@@ -329,8 +355,10 @@ def main():
                 with st.chat_message("assistant"):
                     st.write(response)
                     if image_url:
-                        with st.container():
-                            st.image(image_url, width=300, caption="Click to expand")
+                        img = download_image(image_url)
+                        if img:
+                            with st.container():
+                                st.image(img, width=300, caption="Click to expand")
                     else:
                         st.error("Sorry, I couldn't generate that image right now.")
                 
