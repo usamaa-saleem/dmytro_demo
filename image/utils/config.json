@@ -1,0 +1,26 @@
+{
+    "default": {
+        "workflow_file": "workflow.json",
+        "prefix_prompt": "realistic photo of woman, realistic photo, HD, no plastic body, ",
+        "postfix_prompt": " ,real anatomy, realistic skin texture, slim body, medium bust, brown hair",
+        "negative_prompt": "",
+        "noise_seed_nodes": [
+            "25"
+        ],
+        "prompt_nodes_basic": [
+            "6"
+        ],
+        "negative_prompt_nodes": [
+        ],
+        "batch_nodes": [
+            "27"
+        ],
+        "size_nodes": [
+            "27"
+        ],
+        "image_input_nodes": [
+            "67"
+        ],
+        "breaking_steps": 20
+    }
+}

@@ -1,0 +1,7 @@
+{
+    "input": { 
+   "input_image": "https://firebasestorage.googleapis.com/v0/b/arslan-zalmi.firebasestorage.app/o/demo-images%2Fsample%20(15).png?alt=media&token=a3ecead1-02b3-45d6-9ef5-0728b06b61a0", 
+   "model": "default",
+   "prompt": "girl in red lace dress holding the sign 'somie is the best'"
+    }
+}
