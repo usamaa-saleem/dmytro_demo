@@ -13,9 +13,9 @@ from io import BytesIO
 load_dotenv()
 
 # Configuration
-MISTRAL_API_KEY = "vs8RXNaQzh5SMsc2OGWLjo3ETyaU8kNL"  # Replace with your actual API key
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
-RUNPOD_API_KEY = "rpa_FGAG5AGVUMJWPYUGP67M3KJ0W6EPF9PDY20WCKLE1botxc"
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY")
 RUNPOD_API_URL = "https://api.runpod.ai/v2/zg3dmoeo5xvf9z/runsync"
 MAX_HISTORY_LENGTH = 40  # Maximum number of messages to keep (excluding system prompt)
 
