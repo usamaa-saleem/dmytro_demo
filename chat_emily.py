@@ -174,16 +174,30 @@ def construct_image_prompt(user_message, chat_history, direct_prompt=None):
     
     return ", ".join(prompt_elements)
 
+def download_image(image_url):
+    """Download image from URL and return as PIL Image object."""
+    try:
+        # Validate URL 
+        if not image_url or not isinstance(image_url, str) or not image_url.startswith(('http://', 'https://')):
+            st.error(f"Invalid image URL: {image_url}")
+            return None
+            
+        response = requests.get(image_url)
+        response.raise_for_status()
+        return Image.open(BytesIO(response.content))
+    except Exception as e:
+        st.error(f"Failed to download image: {str(e)}")
+        return None
+
 def generate_image_url(prompt):
-    """Generate an image using RunPod API and return the URL."""
+    """Generate an image based on the prompt using Stable Diffusion API."""
     headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {RUNPOD_API_KEY}"
+        "Authorization": f"Bearer {RUNPOD_API_KEY}",
+        "Content-Type": "application/json"
     }
     
-    print(f"Generated prompt: {prompt}")
-    
-    payload = {
+    # Format the request according to the RunPod API requirements
+    data = {
         "input": {
             "input_image": "https://firebasestorage.googleapis.com/v0/b/arslan-zalmi.firebasestorage.app/o/demo-images%2Fsample%20(15).png?alt=media&token=a3ecead1-02b3-45d6-9ef5-0728b06b61a0",
             "model": "default",
@@ -191,21 +205,43 @@ def generate_image_url(prompt):
         }
     }
     
-    with st.spinner('Generating something special for you... 💖'):
-        try:
-            response = requests.post(RUNPOD_API_URL, headers=headers, json=payload)
+    try:
+        with st.spinner('Creating something special for you... 💖'):
+            response = requests.post(RUNPOD_API_URL, headers=headers, json=data)
             response.raise_for_status()
-            result = response.json()
+            response_data = response.json()
             
-            if result.get("status") == "COMPLETED" and result.get("output") and len(result["output"]) > 0:
-                return result["output"][0]
-            else:
-                st.error("Failed to generate image")
-                return None
+            # For runsync, we get the completed result directly
+            if response_data.get("status") == "COMPLETED":
+                # Check if there's an error in the output
+                if isinstance(response_data.get("output"), str) and "error" in response_data.get("output", ""):
+                    st.error(f"API Error: {response_data.get('output')}")
+                    return None
                 
-        except Exception as e:
-            st.error(f"Error generating image: {str(e)}")
+                # Ensure output exists and contains a URL
+                if "output" in response_data and response_data["output"]:
+                    # If output is a list with URLs
+                    if isinstance(response_data["output"], list) and len(response_data["output"]) > 0:
+                        image_url = response_data["output"][0]
+                    # If output is a direct URL string
+                    elif isinstance(response_data["output"], str) and response_data["output"].startswith(('http://', 'https://')):
+                        image_url = response_data["output"]
+                    # If output is a dict with a URL field
+                    elif isinstance(response_data["output"], dict) and "url" in response_data["output"]:
+                        image_url = response_data["output"]["url"]
+                    else:
+                        st.error(f"Cannot extract URL from output: {response_data['output']}")
+                        return None
+                    
+                    # Validate URL format
+                    if image_url and isinstance(image_url, str) and image_url.startswith(('http://', 'https://')):
+                        return image_url
+            
+            st.error(f"Invalid response format: {response_data}")
             return None
+    except Exception as e:
+        st.error(f"Error generating image: {str(e)}")
+        return None
 
 def get_mistral_response(messages):
     """Get a response from the Mistral API."""
@@ -244,15 +280,125 @@ def get_mistral_response(messages):
         st.error(f"Error getting response from Mistral: {str(e)}")
         return "I'm having trouble connecting right now. Can we try again?"
 
-def download_image(image_url):
-    """Download image from URL and return as PIL Image object."""
-    try:
-        response = requests.get(image_url)
-        response.raise_for_status()
-        return Image.open(BytesIO(response.content))
-    except Exception as e:
-        st.error(f"Failed to download image: {str(e)}")
-        return None
+def is_image_request(message):
+    """Simple wrapper for detect_image_request that just returns the boolean."""
+    is_request, _ = detect_image_request(message)
+    return is_request
+
+def process_user_message(user_message):
+    """Process the user message and generate a response with possible image."""
+    # Display user message
+    with st.chat_message("user"):
+        st.write(user_message)
+    
+    # Add user message to chat history
+    st.session_state.chat_history.append({"role": "user", "content": user_message})
+    
+    # Handle first interaction
+    if st.session_state.waiting_for_first_response:
+        positive_responses = [
+            'yes', 'yeah', 'yep', 'yup', 'sure',
+            'okay', 'ok', 'k', 'kk',
+            'show', 'please', 'pls',
+            'absolutely', 'definitely',
+            'love to', 'would love',
+            'of course', 'hell yes',
+            'go ahead', 'do it',
+            'cant wait', "can't wait",
+            'show me', 'let me see',
+            'excited', 'ready',
+            'want', 'wanna',
+            '😘', '😍', '🥰', '❤️', '💋'
+        ]
+        
+        if any(word in user_message.lower() for word in positive_responses):
+            st.session_state.waiting_for_first_response = False
+            default_prompt = "beautiful girl with long brown hair, slim figure, sexy pose, bust showing, boobs, high quality, photorealistic, detailed, natural lighting"
+            
+            image_url = generate_image_url(default_prompt)
+            
+            response = "Mmm... I hope you like what you see 💋"
+            
+            # Add response to chat history
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response,
+                "image_url": image_url
+            })
+            
+            # Display response
+            with st.chat_message("assistant"):
+                st.write(response)
+                if image_url and isinstance(image_url, str) and image_url.startswith(('http://', 'https://')):
+                    img = download_image(image_url)
+                    if img:
+                        with st.container():
+                            st.image(img, width=300, caption="Click to expand")
+                elif image_url is not None:
+                    st.error("I couldn't generate that image right now. The URL was invalid.")
+                else:
+                    st.error("I couldn't generate that image right now.")
+        else:
+            response = get_mistral_response(st.session_state.chat_history)
+            
+            # Add response to chat history
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response
+            })
+            
+            # Display response
+            with st.chat_message("assistant"):
+                st.write(response)
+    # Handle image requests
+    elif is_image_request(user_message):
+        is_image_request_bool, direct_prompt = detect_image_request(user_message)
+        
+        # Extract location from the message for the image prompt
+        image_prompt = construct_image_prompt(
+            user_message, 
+            st.session_state.chat_history,
+            direct_prompt=direct_prompt
+        )
+        
+        # Generate image
+        image_url = generate_image_url(image_prompt)
+        
+        # Get appropriate response text
+        if direct_prompt:
+            response = "I'll create that for you right away... 💋"
+        else:
+            response = "Let me show you something special... just for you 💋"
+        
+        # Add response to chat history with image
+        st.session_state.chat_history.append({
+            "role": "assistant", 
+            "content": response,
+            "image_url": image_url
+        })
+        
+        # Display response
+        with st.chat_message("assistant"):
+            st.write(response)
+            if image_url and isinstance(image_url, str) and image_url.startswith(('http://', 'https://')):
+                img = download_image(image_url)
+                if img:
+                    with st.container():
+                        st.image(img, width=300, caption="Click to expand")
+            elif image_url is not None:
+                st.error("I couldn't generate that image right now. The URL was invalid.")
+            else:
+                st.error("I couldn't generate that image right now.")
+    else:
+        # Get response from Mistral
+        response = get_mistral_response(st.session_state.chat_history)
+        
+        # Add response to chat history
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        
+        # Display response
+        with st.chat_message("assistant"):
+            st.write(response)
 
 def main():
     st.title("Chat with Emily 💝")
@@ -266,112 +412,22 @@ def main():
             with st.chat_message(message["role"]):
                 st.write(message["content"])
                 if message.get("image_url"):
-                    if message["image_url"]:
+                    # Validate the URL before attempting to download
+                    image_url = message["image_url"]
+                    if image_url and isinstance(image_url, str) and image_url.startswith(('http://', 'https://')):
                         # Download and display image
-                        img = download_image(message["image_url"])
+                        img = download_image(image_url)
                         if img:
                             with st.container():
                                 st.image(img, width=300, caption="Click to expand")
                     else:
-                        st.error("Sorry, I couldn't generate that image right now.")
+                        st.error("Invalid image URL format")
     
     # Get user input
     user_message = st.chat_input("Type your message here...")
     
     if user_message:
-        with st.chat_message("user"):
-            st.write(user_message)
-        
-        st.session_state.chat_history.append({"role": "user", "content": user_message})
-        
-        # Handle first interaction
-        if st.session_state.waiting_for_first_response:
-            positive_responses = [
-                'yes', 'yeah', 'yep', 'yup', 'sure',
-                'okay', 'ok', 'k', 'kk',
-                'show', 'please', 'pls',
-                'absolutely', 'definitely',
-                'love to', 'would love',
-                'of course', 'hell yes',
-                'go ahead', 'do it',
-                'cant wait', "can't wait",
-                'show me', 'let me see',
-                'excited', 'ready',
-                'want', 'wanna',
-                '😘', '😍', '🥰', '❤️', '💋'
-            ]
-            
-            if any(word in user_message.lower() for word in positive_responses):
-                st.session_state.waiting_for_first_response = False
-                default_prompt = "beautiful girl with long brown hair, slim figure, sexy pose, bust showing, boobs, high quality, photorealistic, detailed, natural lighting"
-                image_url = generate_image_url(default_prompt)
-                
-                response = "Mmm... I hope you like what you see 💋"
-                with st.chat_message("assistant"):
-                    st.write(response)
-                    if image_url:
-                        img = download_image(image_url)
-                        if img:
-                            with st.container():
-                                st.image(img, width=300, caption="Click to expand")
-                    else:
-                        st.error("Sorry, I couldn't generate that image right now.")
-                
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": response,
-                    "image_url": image_url
-                })
-            else:
-                response = get_mistral_response(st.session_state.chat_history)
-                with st.chat_message("assistant"):
-                    st.write(response)
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": response
-                })
-        else:
-            # Regular chat flow
-            is_image_request, direct_prompt = detect_image_request(user_message)
-            
-            if is_image_request:
-                image_prompt = construct_image_prompt(
-                    user_message, 
-                    st.session_state.chat_history,
-                    direct_prompt=direct_prompt
-                )
-                image_url = generate_image_url(image_prompt)
-                
-                if direct_prompt:
-                    response = "I'll create that for you right away... 💋"
-                else:
-                    response = "Let me show you something special... just for you 💋"
-                
-                with st.chat_message("assistant"):
-                    st.write(response)
-                    if image_url:
-                        img = download_image(image_url)
-                        if img:
-                            with st.container():
-                                st.image(img, width=300, caption="Click to expand")
-                    else:
-                        st.error("Sorry, I couldn't generate that image right now.")
-                
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": response,
-                    "image_url": image_url
-                })
-            else:
-                response = get_mistral_response(st.session_state.chat_history)
-                
-                with st.chat_message("assistant"):
-                    st.write(response)
-                
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": response
-                })
+        process_user_message(user_message)
         
         st.session_state.chat_history = trim_chat_history(st.session_state.chat_history)
 
